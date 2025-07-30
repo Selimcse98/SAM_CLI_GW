@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  SAM template for detecting EventBridge rule modifications/deletions
+  and notifying via SNS
+
+Resources:
+  # SNS Topic for notifications
+  EventBridgeRuleChangeTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: EventBridgeRuleChangeNotifications
+      Subscription:
+        - Protocol: email
+          Endpoint: selimcse98@gmail.com
+        - Protocol: email
+          Endpoint: mmiah@guidewire.com
+
+  # Lambda function to process events
+  EventBridgeRuleMonitorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.13
+      Timeout: 15
+      MemorySize: 256
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt EventBridgeRuleChangeTopic.TopicName
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref EventBridgeRuleChangeTopic
+
+  # EventBridge Rule to detect CloudTrail events
+  EventBridgeRuleMonitorRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Detects EventBridge rule modifications or deletions"
+      EventPattern:
+        source:
+          - "aws.events"
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "events.amazonaws.com"
+          eventName:
+            - "DeleteRule"
+            - "PutRule"
+            - "DisableRule"
+            - "EnableRule"
+            - PutTargets
+            - RemoveTargets
+      Targets:
+        - Arn: !GetAtt EventBridgeRuleMonitorFunction.Arn
+          Id: "EventBridgeRuleMonitorLambdaTarget"
+
+  # Permission for EventBridge to invoke Lambda
+  EventBridgeRuleMonitorPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EventBridgeRuleMonitorFunction
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt EventBridgeRuleMonitorRule.Arn
+
+Outputs:
+  EventBridgeRuleChangeTopicArn:
+    Description: "ARN of the SNS topic for notifications"
+    Value: !Ref EventBridgeRuleChangeTopic
+  EventBridgeRuleMonitorFunctionArn:
+    Description: "ARN of the monitoring Lambda function"
+    Value: !GetAtt EventBridgeRuleMonitorFunction.Arn

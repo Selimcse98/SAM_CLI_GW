@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda to detect EventBridge rule changes and notify via SNS
+
+Resources:
+
+  AlertSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: selimcse98@gamil.com
+        # Add more endpoints as needed
+
+  EventBridgeAlertFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Events:
+        EventBridgeRuleChange:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source:
+                - "aws.events"
+              detail-type:
+                - "AWS API Call via CloudTrail"
+              detail:
+                eventName:
+                  - "DeleteRule"
+                  - "UpdateRule"
+                eventSource:
+                  - "events.amazonaws.com"
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref AlertSNSTopic

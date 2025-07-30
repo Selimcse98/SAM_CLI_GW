@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Monitor EventBridge rule changes and send SNS notifications
+
+Parameters:
+  NotificationEmail:
+    Type: String
+    Default: selimcse98@gmail.com
+    Description: Email address for notifications
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.13
+    Environment:
+      Variables:
+        SNS_TOPIC_ARN: !Ref EventBridgeMonitorTopic
+
+Resources:
+  # SNS Topic for notifications
+  EventBridgeMonitorTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: eventbridge-rule-monitor
+      DisplayName: EventBridge Rule Monitor Notifications
+
+  # SNS Subscription
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref EventBridgeMonitorTopic
+      Endpoint: !Ref NotificationEmail
+
+  # Lambda function to process CloudTrail events
+  EventBridgeMonitorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: eventbridge-rule-monitor
+      CodeUri: src/
+      Handler: lambda_function.lambda_handler
+      Description: Monitor EventBridge rule changes from CloudTrail
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt EventBridgeMonitorTopic.TopicName
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: '*'
+      Events:
+        CloudTrailEvent:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source: 
+                - aws.events
+              detail-type:
+                - AWS API Call via CloudTrail
+              detail:
+                eventSource:
+                  - events.amazonaws.com
+                eventName:
+                  - DeleteRule
+                  - PutRule
+                  - DisableRule
+                  - EnableRule
+                  - PutTargets
+                  - RemoveTargets
+
+  # CloudWatch Log Group for Lambda function
+  EventBridgeMonitorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${EventBridgeMonitorFunction}'
+      RetentionInDays: 14
+
+Outputs:
+  SNSTopicArn:
+    Description: ARN of the SNS topic for notifications
+    Value: !Ref EventBridgeMonitorTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-SNSTopicArn'
+  
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt EventBridgeMonitorFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaFunctionArn'

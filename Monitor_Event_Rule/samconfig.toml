@@ -1,0 +1,12 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "Monitor-Event-Rules-and-Notify"
+confirm_changeset = true
+disable_rollback = true
+capabilities = ["CAPABILITY_IAM"]
+resolve_s3 = true
+profile = "gwre-is-icare-dev"
+region = "ap-southeast-2"
+

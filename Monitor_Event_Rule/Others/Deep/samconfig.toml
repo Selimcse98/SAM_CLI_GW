@@ -1,0 +1,7 @@
+version = 0.1
+[default.deploy.parameters]
+stack_name = "Monitor-Event-Rule-D"
+confirm_changeset = true
+disable_rollback = true
+capabilities = ["CAPABILITY_IAM"]
+resolve_s3 = true

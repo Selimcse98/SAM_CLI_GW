@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda triggered by CloudTrail events for EventBridge rule changes.
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: python3.12
+    Handler: app.lambda_handler
+
+Resources:
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: selimcse98@gmail.com
+
+  RuleMonitorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: eventbridge_rule_monitor/
+      Events:
+        EventBridgeChange:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source:
+                - "aws.events"
+              detail-type:
+                - "AWS API Call via CloudTrail"
+              detail:
+                eventSource:
+                  - "events.amazonaws.com"
+                eventName:
+                  - "DeleteRule"
+                  - "DisableRule"
+                  - "PutRule"
+                  - "EnableRule"
+                  - "RemoveTargets"
+                  - "PutTargets"
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref SNSTopic
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt SNSTopic.TopicName

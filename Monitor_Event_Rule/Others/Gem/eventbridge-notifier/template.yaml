@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM template to detect EventBridge rule changes and notify via SNS.
+
+Parameters:
+  NotificationEmail:
+    Type: String
+    Description: The email address to subscribe to the SNS topic for notifications.
+    Default: selimcse98@gamil.com
+
+Resources:
+  # The Lambda function that processes the event and sends the notification
+  EventRuleChangeNotifierFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref EventChangeSnsTopic
+      Policies:
+        # Give the function permission to publish to our SNS topic
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt EventChangeSnsTopic.TopicName
+      Events:
+        # The EventBridge Rule that listens for CloudTrail events
+        DetectRuleChangeEvent:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - aws.events
+              detail-type:
+                - AWS API Call via CloudTrail
+              detail:
+                eventSource:
+                  - events.amazonaws.com
+                eventName:
+                  - PutRule
+                  - DeleteRule
+
+  # The SNS topic that will receive the notifications
+  EventChangeSnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: EventBridgeRuleChangeNotifierTopic
+
+  # The email subscription for the SNS topic
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref EventChangeSnsTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+Outputs:
+  SnsTopicName:
+    Description: "The name of the SNS topic for notifications."
+    Value: !GetAtt EventChangeSnsTopic.TopicName
