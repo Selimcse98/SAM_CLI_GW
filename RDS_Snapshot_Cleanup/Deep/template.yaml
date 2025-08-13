@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RDS Snapshot Cleanup Function
+
+Globals:
+  Function:
+    Timeout: 300
+    Runtime: python3.9
+    MemorySize: 128
+    Environment:
+      Variables:
+        SNS_TOPIC_ARN: !Ref SnapshotCleanupSNSTopic
+
+Resources:
+  SnapshotCleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - rds:DescribeDBClusterSnapshots
+                - rds:DeleteDBClusterSnapshot
+                - rds:ListTagsForResource
+              Resource: "*"
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref SnapshotCleanupSNSTopic
+
+  DailyCleanupRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Daily trigger for RDS snapshot cleanup"
+      ScheduleExpression: "cron(0 12 * * ? *)" # Runs daily at 12:00 UTC
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SnapshotCleanupFunction.Arn
+          Id: SnapshotCleanupFunctionTarget
+
+  SnapshotCleanupSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: RDSSnapshotCleanupNotifications
+      TopicName: RDS-Snapshot-Cleanup-Notifications
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SnapshotCleanupFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DailyCleanupRule.Arn
+
+Outputs:
+  SnapshotCleanupFunction:
+    Description: "RDS Snapshot Cleanup Function ARN"
+    Value: !GetAtt SnapshotCleanupFunction.Arn
+  SnapshotCleanupSNSTopic:
+    Description: "SNS Topic for cleanup notifications"
+    Value: !Ref SnapshotCleanupSNSTopic

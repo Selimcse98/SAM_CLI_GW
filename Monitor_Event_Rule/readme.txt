@@ -1,4 +1,49 @@
+Testing CLI commands:
+aws events put-rule --name test-rule-selim --description "Test rule for monitoring" --state ENABLED --schedule-expression "rate(60 minutes)" --profile gwre-is-icare-dev
+aws events remove-targets --rule test-rule-selim --ids "1" --profile gwre-is-icare-dev
+aws events delete-rule --name test-rule-selim --profile gwre-is-icare-dev
+aws events disable-rule --name test-rule-selim --profile gwre-is-icare-dev
+aws events enable-rule --name test-rule-selim --profile gwre-is-icare-dev
+% aws events put-targets --rule test-rule-selim --targets '[{"Id":"1","Arn":"arn:aws:logs:ap-southeast-2:018244321036:log-group:/aws/events/test-rule-selim"}]' --profile gwre-is-icare-dev
+{
+    "FailedEntryCount": 0,
+    "FailedEntries": []
+}
+% aws events list-targets-by-rule --rule test-rule-selim --profile gwre-is-icare-dev
+{
+    "Targets": [
+        {
+            "Id": "1",
+            "Arn": "arn:aws:logs:ap-southeast-2:018244321036:log-group:/aws/events/test-rule-selim"
+        }
+    ]
+}
+% aws events describe-rule --name test-rule-selim --profile gwre-is-icare-dev
+{
+    "Name": "test-rule-selim",
+    "Arn": "arn:aws:events:ap-southeast-2:018244321036:rule/test-rule-selim",
+    "ScheduleExpression": "rate(60 minutes)",
+    "State": "ENABLED",
+    "Description": "Test rule for monitoring",
+    "EventBusName": "default",
+    "CreatedBy": "018244321036"
+}
+% aws events list-rules --name-prefix test-rule-selim --profile gwre-is-icare-dev
+{
+    "Rules": [
+        {
+            "Name": "test-rule-selim",
+            "Arn": "arn:aws:events:ap-southeast-2:018244321036:rule/test-rule-selim",
+            "State": "ENABLED",
+            "Description": "Test rule for monitoring",
+            "ScheduleExpression": "rate(60 minutes)",
+            "EventBusName": "default"
+        }
+    ]
+}
 
+
+==================
 sam init --name eventbridge-rule-monitor --runtime python3.9 --app-template hello-world
 % sam init --name eventbridge-rule-monitor --runtime python3.9 --app-template hello-world
 Based on your selections, the only Template available is Hello World Example.
@@ -50,12 +95,12 @@ Commands you can use next
 # sam deploy --profile gwre-is-cloudops-dev --stack-name weekly-cost-tracker --region us-east-2 --no-confirm-changeset --disable-rollback --capabilities CAPABILITY_IAM --save-params --config-file samconfig.toml --config-env default
 % cat samconfig.toml 
 
-mmiah@mmiah-TVWRVF2LNH Monitor_Event_Rule % sam delete --profile gwre-is-icare-dev --region ap-southeast-2 --stack-name Monitor-Event-Rule-D
-	Are you sure you want to delete the stack Monitor-Event-Rule-D in the region ap-southeast-2 ? [y/N]: y
+mmiah@mmiah-TVWRVF2LNH Monitor_Event_Rule % sam delete --profile gwre-is-icare-dev --region ap-southeast-2 --stack-name Monitor-EventBridge-Rules
+	Are you sure you want to delete the stack Monitor-EventBridge-Rules in the region ap-southeast-2 ? [y/N]: y
 	Do you want to delete the template file 075e4066d028ae711c5505b72e7d3206.template in S3? [y/N]: y
         - Deleting S3 object with key cefe9259a607b74d95a11133963010bf                                                                                                                                          
         - Deleting S3 object with key 075e4066d028ae711c5505b72e7d3206.template                                                                                                                                 
-	- Deleting Cloudformation stack Monitor-Event-Rule-D
+	- Deleting Cloudformation stack Monitor-EventBridge-Rules
 Deleted successfully
 
 % aws lambda invoke --function-name weekly_cost_tracker --profile gwre-is-cloudops-dev output.txt
@@ -90,8 +135,8 @@ Initiating deployment
 =====================
 Error: Failed to create/update the stack: Monitor_Event_Rule-D, An error occurred (ValidationError) when calling the DescribeStacks operation: 1 validation error detected: Value 'Monitor_Event_Rule-D' at 'stackName' failed to satisfy constraint: Member must satisfy regular expression pattern: [a-zA-Z][-a-zA-Z0-9]*|arn:[-a-zA-Z0-9:/._+]*
 
-% sam deploy --profile gwre-is-icare-dev --region ap-southeast-2 --stack-name Monitor-Event-Rule-D --confirm-changeset --disable-rollback --capabilities CAPABILITY_IAM --save-params --config-file samconfig.toml --config-env default --resolve-s3
-Saved parameters to config file 'samconfig.toml' under environment 'default': {'stack_name': 'Monitor-Event-Rule-D', 'confirm_changeset': True, 'disable_rollback': True, 'capabilities': ('CAPABILITY_IAM',),  
+% sam deploy --profile gwre-is-icare-dev --region ap-southeast-2 --stack-name Monitor-EventBridge-Rules --confirm-changeset --disable-rollback --capabilities CAPABILITY_IAM --save-params --config-file samconfig.toml --config-env default --resolve-s3
+Saved parameters to config file 'samconfig.toml' under environment 'default': {'stack_name': 'Monitor-EventBridge-Rules', 'confirm_changeset': True, 'disable_rollback': True, 'capabilities': ('CAPABILITY_IAM',),  
 'resolve_s3': True}
 		Managed S3 bucket: aws-sam-cli-managed-default-samclisourcebucket-4p3e5qf1wkfk
 		A different default S3 bucket can be set in samconfig.toml
@@ -99,7 +144,7 @@ Saved parameters to config file 'samconfig.toml' under environment 'default': {'
 File with same data already exists at fb91b012b8141cb7ba395cada8cd3653, skipping upload
 	Deploying with following values
 	===============================
-	Stack name                   : Monitor-Event-Rule-D
+	Stack name                   : Monitor-EventBridge-Rules
 	Region                       : ap-southeast-2
 	Confirm changeset            : True
 	Disable rollback             : True
@@ -130,7 +175,7 @@ CloudFormation events from stack operations (refresh every 5.0 seconds)
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 ResourceStatus                                      ResourceType                                        LogicalResourceId                                   ResourceStatusReason                              
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-CREATE_IN_PROGRESS                                  AWS::CloudFormation::Stack                          Monitor-Event-Rule-D                                User Initiated                                    
+CREATE_IN_PROGRESS                                  AWS::CloudFormation::Stack                          Monitor-EventBridge-Rules                                User Initiated                                    
 CREATE_IN_PROGRESS                                  AWS::SNS::Topic                                     EventBridgeRuleChangeTopic                          -                                                 
 CREATE_IN_PROGRESS                                  AWS::SNS::Topic                                     EventBridgeRuleChangeTopic                          Resource creation Initiated                       
 CREATE_COMPLETE                                     AWS::SNS::Topic                                     EventBridgeRuleChangeTopic                          -                                                 
@@ -146,7 +191,7 @@ CREATE_COMPLETE                                     AWS::Events::Rule           
 CREATE_IN_PROGRESS                                  AWS::Lambda::Permission                             EventBridgeRuleMonitorPermission                    -                                                 
 CREATE_IN_PROGRESS                                  AWS::Lambda::Permission                             EventBridgeRuleMonitorPermission                    Resource creation Initiated                       
 CREATE_COMPLETE                                     AWS::Lambda::Permission                             EventBridgeRuleMonitorPermission                    -                                                 
-CREATE_COMPLETE                                     AWS::CloudFormation::Stack                          Monitor-Event-Rule-D                                -                                                 
+CREATE_COMPLETE                                     AWS::CloudFormation::Stack                          Monitor-EventBridge-Rules                                -                                                 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 CloudFormation outputs from deployed stack
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -157,6 +202,48 @@ Description         ARN of the SNS topic for notifications
 Value               arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications                                                                                                              
 Key                 EventBridgeRuleMonitorFunctionArn                                                                                                                                                       
 Description         ARN of the monitoring Lambda function                                                                                                                                                   
-Value               arn:aws:lambda:ap-southeast-2:018244321036:function:Monitor-Event-Rule-D-EventBridgeRuleMonitorFunctio-cDFh5FG7sr99                                                                     
+Value               arn:aws:lambda:ap-southeast-2:018244321036:function:Monitor-EventBridge-Rules-EventBridgeRuleMonitorFunctio-cDFh5FG7sr99                                                                     
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-Successfully created/updated stack - Monitor-Event-Rule-D in ap-southeast-2
+Successfully created/updated stack - Monitor-EventBridge-Rules in ap-southeast-2
+
+% aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications --profile gwre-is-icare-dev
+{
+    "Subscriptions": [
+        {
+            "SubscriptionArn": "PendingConfirmation",
+            "Owner": "018244321036",
+            "Protocol": "email",
+            "Endpoint": "selimcse98@gmail.com",
+            "TopicArn": "arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications"
+        },
+        {
+            "SubscriptionArn": "arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications:7ef78c4c-d81c-428c-a324-c78d2e7f3e9e",
+            "Owner": "018244321036",
+            "Protocol": "email",
+            "Endpoint": "aragunathan@guidewire.com",
+            "TopicArn": "arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications"
+        },
+        {
+            "SubscriptionArn": "arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications:594a3479-ebaa-4b6e-be21-b4a52c70236a",
+            "Owner": "018244321036",
+            "Protocol": "email",
+            "Endpoint": "mmiah@guidewire.com",
+            "TopicArn": "arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications"
+        },
+        {
+            "SubscriptionArn": "PendingConfirmation",
+            "Owner": "018244321036",
+            "Protocol": "email",
+            "Endpoint": "sdatta@guidewire.com",
+            "TopicArn": "arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications"
+        },
+        {
+            "SubscriptionArn": "PendingConfirmation",
+            "Owner": "018244321036",
+            "Protocol": "email",
+            "Endpoint": "kroy@guidewire.com",
+            "TopicArn": "arn:aws:sns:ap-southeast-2:018244321036:EventBridgeRuleChangeNotifications"
+        }
+    ]
+}
+

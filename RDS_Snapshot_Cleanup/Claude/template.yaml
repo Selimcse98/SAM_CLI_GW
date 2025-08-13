@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RDS Snapshot Cleanup Lambda with EventBridge and SNS
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, test, prod]
+    Description: Environment name
+  
+  NotificationEmail:
+    Type: String
+    Description: Email address for SNS notifications
+    Default: ops-team@yourcompany.com
+  
+  SnapshotFilterString:
+    Type: String
+    Default: insuranceplatform-prod-deployment-
+    Description: Filter string to identify snapshots for cleanup
+  
+  DefaultRetentionDays:
+    Type: Number
+    Default: 35
+    Description: Default retention period in days
+
+Globals:
+  Function:
+    Timeout: 900
+    MemorySize: 512
+    Runtime: python3.11
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        SNS_TOPIC_ARN: !Ref SnapshotCleanupTopic
+        SNAPSHOT_FILTER: !Ref SnapshotFilterString
+        DEFAULT_RETENTION_DAYS: !Ref DefaultRetentionDays
+
+Resources:
+  # SNS Topic for notifications
+  SnapshotCleanupTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "rds-snapshot-cleanup-${Environment}"
+      DisplayName: RDS Snapshot Cleanup Notifications
+
+  # SNS Subscription
+  SnapshotCleanupSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref SnapshotCleanupTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+  # Lambda Function
+  RdsSnapshotCleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "rds-snapshot-cleanup-${Environment}"
+      CodeUri: src/
+      Handler: lambda_function.lambda_handler
+      Description: Automated RDS snapshot cleanup based on retention tags
+      
+      # EventBridge Schedule - runs daily at 2 AM UTC
+      Events:
+        ScheduledCleanup:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 2 * * ? *)
+            Description: Daily RDS snapshot cleanup
+            Enabled: true
+      
+      # IAM Policies
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            # RDS permissions
+            - Effect: Allow
+              Action:
+                - rds:DescribeDBClusterSnapshots
+                - rds:DescribeDBSnapshots
+                - rds:DeleteDBClusterSnapshot
+                - rds:DeleteDBSnapshot
+                - rds:ListTagsForResource
+              Resource: "*"
+            
+            # SNS permissions
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref SnapshotCleanupTopic
+            
+            # CloudWatch Logs permissions
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/rds-snapshot-cleanup-${Environment}:*"
+
+      # Dead Letter Queue for failed executions
+      DeadLetterQueue:
+        Type: SQS
+        TargetArn: !GetAtt SnapshotCleanupDLQ.Arn
+
+  # Dead Letter Queue
+  SnapshotCleanupDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "rds-snapshot-cleanup-dlq-${Environment}"
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  # CloudWatch Log Group
+  SnapshotCleanupLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/rds-snapshot-cleanup-${Environment}"
+      RetentionInDays: 30
+
+Outputs:
+  LambdaFunctionArn:
+    Description: ARN of the RDS Snapshot Cleanup Lambda function
+    Value: !GetAtt RdsSnapshotCleanupFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaFunctionArn"
+  
+  SNSTopicArn:
+    Description: ARN of the SNS topic for notifications
+    Value: !Ref SnapshotCleanupTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-SNSTopicArn"
+  
+  DLQArn:
+    Description: ARN of the Dead Letter Queue
+    Value: !GetAtt SnapshotCleanupDLQ.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-DLQArn"

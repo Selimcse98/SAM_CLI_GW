@@ -9,9 +9,13 @@ Resources:
       TopicName: EventBridgeRuleChangeNotifications
       Subscription:
       - Protocol: email
-        Endpoint: selimcse98@gmail.com
+        Endpoint: kroy@guidewire.com
       - Protocol: email
         Endpoint: mmiah@guidewire.com
+      - Protocol: email
+        Endpoint: aragunathan@guidewire.com
+      - Protocol: email
+        Endpoint: sdatta@guidewire.com
   EventBridgeRuleMonitorFunction:
     Type: AWS::Serverless::Function
     Properties:

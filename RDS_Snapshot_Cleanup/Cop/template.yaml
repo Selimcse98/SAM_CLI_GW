@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RDS Snapshot Cleanup Lambda
+
+Resources:
+  RDSSnapshotCleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Timeout: 60
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref SnapshotCleanupTopic
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - rds:DescribeDBClusterSnapshots
+                - rds:DeleteDBClusterSnapshot
+                - rds:ListTagsForResource
+              Resource: "*"
+            - Effect: Allow
+              Action: sns:Publish
+              Resource: !Ref SnapshotCleanupTopic
+
+  SnapshotCleanupRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 day)
+      Targets:
+        - Arn: !GetAtt RDSSnapshotCleanupFunction.Arn
+          Id: "TargetFunction"
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref RDSSnapshotCleanupFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SnapshotCleanupRule.Arn
+
+  SnapshotCleanupTopic:
+    Type: AWS::SNS::Topic

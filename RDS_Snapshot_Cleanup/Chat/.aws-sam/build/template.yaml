@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Cleanup old manual RDS DB Cluster snapshots based on RetentionDays tag
+Globals:
+  Function:
+    Timeout: 300
+    Runtime: python3.13
+Resources:
+  RdsSnapshotCleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: RdsSnapshotCleanupFunction
+      Handler: app.lambda_handler
+      Description: Deletes expired RDS DB cluster snapshots and sends SNS notification
+      MemorySize: 256
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN:
+            Ref: NotificationTopic
+      Policies:
+      - Statement:
+        - Effect: Allow
+          Action:
+          - rds:DescribeDBClusterSnapshots
+          - rds:DeleteDBClusterSnapshot
+          - rds:ListTagsForResource
+          Resource: '*'
+        - Effect: Allow
+          Action:
+          - sns:Publish
+          Resource:
+            Ref: NotificationTopic
+    Metadata:
+      SamResourceId: RdsSnapshotCleanupFunction
+  CleanupSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Expired RDS snapshots Cleanup
+      ScheduleExpression: rate(1 day)
+      Targets:
+      - Arn:
+          Fn::GetAtt:
+          - RdsSnapshotCleanupFunction
+          - Arn
+        Id: RdsSnapshotCleanupTarget
+    DependsOn: RdsSnapshotCleanupFunction
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: RdsSnapshotCleanupFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - CleanupSchedule
+        - Arn
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: RDS Snapshot Cleanup Notification
+      Subscription:
+      - Protocol: email
+        Endpoint: kroy@guidewire.com
+      - Protocol: email
+        Endpoint: mmiah@guidewire.com

@@ -2,7 +2,7 @@ version = 0.1
 [default]
 [default.deploy]
 [default.deploy.parameters]
-stack_name = "Monitor-Event-Rules-and-Notify"
+stack_name = "Monitor-EventBridge-Rules"
 confirm_changeset = true
 disable_rollback = true
 capabilities = ["CAPABILITY_IAM"]

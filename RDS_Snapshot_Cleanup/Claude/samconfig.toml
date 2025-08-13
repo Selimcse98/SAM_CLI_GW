@@ -1,0 +1,61 @@
+# SAM Configuration File
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "rds-snapshot-cleanup"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+image_repositories = []
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "rds-snapshot-cleanup"
+s3_prefix = "rds-snapshot-cleanup"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = true
+image_repositories = []
+parameter_overrides = [
+    "Environment=prod",
+    "NotificationEmail=ops-team@yourcompany.com",
+    "SnapshotFilterString=insuranceplatform-prod-deployment-",
+    "DefaultRetentionDays=35"
+]
+
+# Environment-specific configurations
+[dev]
+[dev.deploy.parameters]
+stack_name = "rds-snapshot-cleanup-dev"
+parameter_overrides = [
+    "Environment=dev",
+    "NotificationEmail=dev-team@yourcompany.com",
+    "SnapshotFilterString=insuranceplatform-dev-deployment-",
+    "DefaultRetentionDays=7"
+]
+
+[test]
+[test.deploy.parameters]
+stack_name = "rds-snapshot-cleanup-test"
+parameter_overrides = [
+    "Environment=test",
+    "NotificationEmail=test-team@yourcompany.com",
+    "SnapshotFilterString=insuranceplatform-test-deployment-",
+    "DefaultRetentionDays=14"
+]
+
+[prod]
+[prod.deploy.parameters]
+stack_name = "rds-snapshot-cleanup-prod"
+parameter_overrides = [
+    "Environment=prod",
+    "NotificationEmail=ops-team@yourcompany.com",
+    "SnapshotFilterString=insuranceplatform-prod-deployment-",
+    "DefaultRetentionDays=35"
+]

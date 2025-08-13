@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM application to delete old RDS manual snapshots based on a retention tag.
+
+Parameters:
+  SnsTopicName:
+    Type: String
+    Description: Name for the SNS topic to send notifications.
+    Default: rds-snapshot-deletion-report
+  SnsEmailAddress:
+    Type: String
+    Description: Email address to subscribe to the SNS topic for notifications.
+  SnapshotFilterString:
+    Type: String
+    Description: A string that must be present in the snapshot name to be considered for deletion.
+    Default: "insuranceplatform-prod-deployment-"
+
+Globals:
+  Function:
+    Timeout: 120 # 2 minutes, should be more than enough
+    Runtime: python3.11
+    MemorySize: 128
+
+Resources:
+  # The Lambda function that performs the cleanup
+  RdsSnapshotCleanupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Description: Finds and deletes RDS manual snapshots older than their 'RetentionDays' tag.
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref SnsNotificationTopic
+          SNAPSHOT_FILTER: !Ref SnapshotFilterString
+      Policies:
+        # Policy granting necessary permissions for the Lambda function
+        - Statement:
+            - Sid: RdsDescribeActions
+              Effect: Allow
+              Action:
+                - rds:DescribeDBClusterSnapshots
+                - rds:ListTagsForResource
+              Resource: "*"
+            - Sid: RdsDeleteAction
+              Effect: Allow
+              Action:
+                - rds:DeleteDBClusterSnapshot
+              Resource: "arn:aws:rds:*:*:cluster-snapshot:*" # Least privilege for delete
+            - Sid: SnsPublishAction
+              Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref SnsNotificationTopic
+      Events:
+        # Trigger this function once a day
+        ScheduledTrigger:
+          Type: Schedule
+          Properties:
+            Name: DailyRdsSnapshotCleanupTrigger
+            Description: "Triggers the RDS snapshot cleanup function daily."
+            Schedule: "rate(1 day)"
+            Enabled: True
+
+  # The SNS Topic for sending notifications
+  SnsNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref SnsTopicName
+
+  # Subscription for the SNS Topic to send emails
+  SnsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref SnsEmailAddress
+      TopicArn: !Ref SnsNotificationTopic
+
+Outputs:
+  LambdaFunctionName:
+    Description: "The name of the RDS Snapshot Cleanup Lambda function"
+    Value: !Ref RdsSnapshotCleanupFunction
+  SnsTopicArn:
+    Description: "The ARN of the SNS topic for notifications"
+    Value: !Ref SnsNotificationTopic
