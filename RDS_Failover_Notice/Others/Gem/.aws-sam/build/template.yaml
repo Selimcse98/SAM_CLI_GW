@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'SAM application to notify on RDS failover events via SNS.
+
+  '
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.13
+    Architectures:
+    - x86_64
+Parameters:
+  EmailSubscriber1:
+    Type: String
+    Description: First email address for SNS notifications.
+    Default: selimcse98@gmail.com
+  EmailSubscriber2:
+    Type: String
+    Description: Second email address for SNS notifications.
+    Default: mmiah@guidewire.com
+  MobileSubscriber1:
+    Type: String
+    Description: First mobile number for SMS notifications (e.g., +61469214498 for
+      Australia).
+    Default: '+61469214498'
+  MobileSubscriber2:
+    Type: String
+    Description: Second mobile number for SMS notifications (e.g., +61469218933 for
+      Australia).
+    Default: '+61469218933'
+Resources:
+  RDSEventTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: RDS Failover Event Notifications
+      TopicName: rds-failover-event-topic
+  EmailSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint:
+        Ref: EmailSubscriber1
+      TopicArn:
+        Ref: RDSEventTopic
+  EmailSubscription2:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint:
+        Ref: EmailSubscriber2
+      TopicArn:
+        Ref: RDSEventTopic
+  MobileSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sms
+      Endpoint:
+        Ref: MobileSubscriber1
+      TopicArn:
+        Ref: RDSEventTopic
+  MobileSubscription2:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sms
+      Endpoint:
+        Ref: MobileSubscriber2
+      TopicArn:
+        Ref: RDSEventTopic
+  RDSFailoverNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: RDSFailoverNotificationFunction
+      Handler: app.lambda_handler
+      Description: Processes RDS failover events and sends a notification to SNS.
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN:
+            Ref: RDSEventTopic
+      Policies:
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - RDSEventTopic
+            - TopicName
+      Events:
+        RDSFailoverEvent:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+              - aws.rds
+              detail-type:
+              - RDS DB Instance Event
+              - RDS DB Cluster Event
+              detail:
+                EventID:
+                - RDS-EVENT-0069
+                - RDS-EVENT-0153
+                - RDS-EVENT-0049
+    Metadata:
+      SamResourceId: RDSFailoverNotificationFunction
+Outputs:
+  RDSFailoverNotificationFunctionArn:
+    Description: Lambda Function ARN for RDS Failover Notifications
+    Value:
+      Fn::GetAtt:
+      - RDSFailoverNotificationFunction
+      - Arn
+  RDSEventTopicArn:
+    Description: SNS Topic ARN for RDS Failover Notifications
+    Value:
+      Ref: RDSEventTopic

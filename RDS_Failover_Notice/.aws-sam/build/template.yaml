@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda to send SNS notifications on RDS failover events
+Globals:
+  Function:
+    Timeout: 60
+    Runtime: python3.13
+    Architectures:
+    - x86_64
+Resources:
+  RdsFailoverNotifyTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: rds-failover-notification-topic
+      DisplayName: RDS Failover Notifications
+      Subscription:
+      - Protocol: email
+        Endpoint: mmiah@guidewire.com
+      - Protocol: sms
+        Endpoint: '0469214498'
+  RDSFailoverNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RDS-Cluster-Failover-Notification
+      CodeUri: RDSFailoverNotificationFunction
+      Handler: app.lambda_handler
+      Description: Processes RDS failover events and sends a notification to SNS.
+      Policies:
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - RdsFailoverNotifyTopic
+            - TopicName
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN:
+            Ref: RdsFailoverNotifyTopic
+          LOG_LEVEL: INFO
+      Events:
+        RDSFailoverEvent:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+              - aws.rds
+              detail-type:
+              - RDS DB Instance Event
+              - RDS DB Cluster Event
+              detail:
+                EventCategories:
+                - failover
+                - failure
+                - availability
+                - notification
+                - configuration-change
+    Metadata:
+      SamResourceId: RDSFailoverNotificationFunction
+Outputs:
+  RdsFailoverNotifyTopicArn:
+    Description: SNS Topic ARN
+    Value:
+      Ref: RdsFailoverNotifyTopic
+  LambdaFunctionArn:
+    Description: Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - RDSFailoverNotificationFunction
+      - Arn

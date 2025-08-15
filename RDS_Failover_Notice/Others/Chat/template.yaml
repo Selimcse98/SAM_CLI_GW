@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda to send SNS notifications on RDS failover events.
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: python3.12
+    Handler: app.lambda_handler
+
+Resources:
+  RDSFailoverTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: rds-failover-topic
+      Subscription:
+        - Protocol: email
+          Endpoint: selimcse98@gmail.com
+        - Protocol: email
+          Endpoint: mmiah@guidewire.com
+        - Protocol: sms
+          Endpoint: "+61469214498"
+        - Protocol: sms
+          Endpoint: "+61469218933"
+
+  RDSFailoverFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref RDSFailoverTopic
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt RDSFailoverTopic.TopicName
+      Events:
+        RDSEvent:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - aws.rds
+              detail-type:
+                - RDS DB Instance Event
+              detail:
+                EventCategories:
+                  - failover
+                EventID:
+                  - RDS-EVENT-0057  # Writer failover
+                  - RDS-EVENT-0034  # Reader failover
+
+Outputs:
+  TopicArn:
+    Description: SNS Topic ARN
+    Value: !Ref RDSFailoverTopic

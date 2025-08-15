@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RDS Failover Notification Lambda
+
+Resources:
+  FailoverNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/
+      Handler: app.lambda_handler
+      Runtime: python3.11
+      Timeout: 10
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref FailoverSNSTopic
+      Events:
+        RDSFailoverEvent:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source:
+                - "aws.rds"
+              detail-type:
+                - "RDS DB Instance Event"
+              detail:
+                EventCategories:
+                  - "failover"
+
+  FailoverSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: "RDS Failover Alerts"
+
+  EmailSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: selimcse98@gmail.com
+      TopicArn: !Ref FailoverSNSTopic
+
+  EmailSubscription2:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: mmiah@guidewire.com
+      TopicArn: !Ref FailoverSNSTopic
+
+  SMSSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sms
+      Endpoint: "+61469214498"
+      TopicArn: !Ref FailoverSNSTopic
+
+  SMSSubscription2:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: sms
+      Endpoint: "+61469218933"
+      TopicArn: !Ref FailoverSNSTopic

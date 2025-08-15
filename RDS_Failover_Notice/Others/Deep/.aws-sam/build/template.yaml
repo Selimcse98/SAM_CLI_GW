@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RDS Failover Notification System
+Resources:
+  RDSEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Trigger when RDS failover events occur
+      EventPattern:
+        source:
+        - aws.rds
+        detail-type:
+        - RDS DB Instance Event
+        detail:
+          EventCategories:
+          - failover
+      State: ENABLED
+      Targets:
+      - Arn:
+          Fn::GetAtt:
+          - RDSFailoverNotificationFunction
+          - Arn
+        Id: RDSFailoverLambdaTarget
+  RDSFailoverNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RDS-Cluster-Failover-Notification
+      CodeUri: RDSFailoverNotificationFunction
+      Handler: app.lambda_handler
+      Runtime: python3.13
+      Timeout: 60
+      Policies:
+      - SNSPublishMessagePolicy:
+          TopicName:
+            Fn::GetAtt:
+            - RdsFailoverNotifyTopic
+            - TopicName
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN:
+            Ref: RdsFailoverNotifyTopic
+      Events:
+        CloudWatchEvent:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source:
+              - aws.rds
+              detail-type:
+              - RDS DB Instance Event
+              detail:
+                EventCategories:
+                - failover
+    Metadata:
+      SamResourceId: RDSFailoverNotificationFunction
+  RdsFailoverNotifyTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: RDS Failover Notifications
+      Subscription:
+      - Protocol: email
+        Endpoint: mmiah@guidewire.com
+      - Protocol: sms
+        Endpoint: '0469214498'
+Outputs:
+  RDSEventRuleArn:
+    Description: EventBridge Rule ARN
+    Value:
+      Fn::GetAtt:
+      - RDSEventRule
+      - Arn
+  RdsFailoverNotifyTopicArn:
+    Description: SNS Topic ARN
+    Value:
+      Ref: RdsFailoverNotifyTopic
+  LambdaFunctionArn:
+    Description: Lambda Function ARN
+    Value:
+      Fn::GetAtt:
+      - RDSFailoverNotificationFunction
+      - Arn

@@ -8,5 +8,5 @@ region = "us-east-2"
 profile = "gwre-shared-services"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-disable_rollback = true
+disable_rollback = false
 image_repositories = []

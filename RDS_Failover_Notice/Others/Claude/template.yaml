@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: RDS Failover Notification System
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.11
+    Environment:
+      Variables:
+        SNS_TOPIC_ARN: !Ref RDSFailoverTopic
+        LOG_LEVEL: INFO
+
+Resources:
+  # SNS Topic for RDS Failover Notifications
+  RDSFailoverTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'rds-failover-notifications-${Environment}'
+      DisplayName: RDS Failover Notifications
+      
+  # Email Subscriptions
+  EmailSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref RDSFailoverTopic
+      Protocol: email
+      Endpoint: selimcse98@gmail.com
+
+  EmailSubscription2:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref RDSFailoverTopic
+      Protocol: email
+      Endpoint: mmiah@guidewire.com
+
+  # SMS/Mobile Subscriptions (Australian numbers)
+  SMSSubscription1:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref RDSFailoverTopic
+      Protocol: sms
+      Endpoint: '+61469214498'  # Australian mobile format
+
+  SMSSubscription2:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref RDSFailoverTopic
+      Protocol: sms
+      Endpoint: '+61469218933'  # Australian mobile format
+
+  # Lambda Function
+  RDSFailoverNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'rds-failover-notification-${Environment}'
+      CodeUri: src/
+      Handler: handler.lambda_handler
+      Description: Processes RDS failover events and sends SNS notifications
+      Events:
+        RDSFailoverEvent:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: 
+                - "aws.rds"
+              detail-type:
+                - "RDS DB Instance Event"
+                - "RDS DB Cluster Event"
+              detail:
+                EventCategories:
+                  - "failover"
+                SourceType:
+                  - "db-instance"
+                  - "db-cluster"
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt RDSFailoverTopic.TopicName
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - rds:DescribeDBInstances
+                - rds:DescribeDBClusters
+              Resource: '*'
+
+  # CloudWatch Log Group
+  RDSFailoverLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/rds-failover-notification-${Environment}'
+      RetentionInDays: 14
+
+Outputs:
+  SNSTopicArn:
+    Description: ARN of the SNS Topic for RDS Failover notifications
+    Value: !Ref RDSFailoverTopic
+    Export:
+      Name: !Sub '${AWS::StackName}-SNSTopicArn'
+
+  LambdaFunctionArn:
+    Description: ARN of the Lambda function
+    Value: !GetAtt RDSFailoverNotificationFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaArn'
+
+  LambdaFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref RDSFailoverNotificationFunction
+    Export:
+      Name: !Sub '${AWS::StackName}-LambdaName'

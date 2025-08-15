@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda to send SNS notifications on RDS failover events
+
+Globals:
+  Function:
+    Timeout: 60
+    Runtime: python3.13
+    Architectures:
+      - x86_64
+
+Resources:
+  RdsFailoverNotifyTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: rds-failover-notification-topic
+      DisplayName: "RDS Failover Notifications"
+      Subscription:
+        - Protocol: "email"
+          Endpoint: "mmiah@guidewire.com"
+        - Protocol: "sms"
+          Endpoint: "0469214498"
+
+  RDSFailoverNotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RDS-Cluster-Failover-Notification
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Description: Processes RDS failover events and sends a notification to SNS.
+      # Runtime: python3.13
+      # Timeout: 60
+      Policies:
+        - SNSPublishMessagePolicy: # Grant permission to publish to the specific SNS topic
+            TopicName: !GetAtt RdsFailoverNotifyTopic.TopicName
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: !Ref RdsFailoverNotifyTopic
+          LOG_LEVEL: INFO # https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs-log-level.html
+      Events:        
+        RDSFailoverEvent: 
+          Type: EventBridgeRule # --- EventBridge Rule to trigger this function ---
+          Properties:
+            Pattern:
+              source:
+                - "aws.rds"
+              detail-type:
+                - "RDS DB Instance Event"
+                - "RDS DB Cluster Event"
+              detail:
+                EventCategories: # https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Events.Messages.html
+                  - "failover"
+                  - "failure"
+                  - "availability"
+                  - "notification"
+                  - "configuration-change"
+                # SourceType:
+                #   - "db-instance"
+                #   - "db-cluster"
+                # EventID: # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_Events.Messages.html
+                #   - RDS-EVENT-0004 # DB instance shutdown.
+                #   - "RDS-EVENT-0006" # DB instance restarted/rebooted.
+                #   - RDS-EVENT-0013 # Multi-AZ instance failover started. https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Events.Messages.html
+                #   - RDS-EVENT-0071 # Completed failover to DB instance: name.
+                #   - RDS-EVENT-0072 # Started same AZ failover to DB instance: name
+                #   - RDS-EVENT-0073 # Started cross AZ failover to DB instance: <name>
+                #   - RDS-EVENT-0088 # DB instance started, A Multi-AZ failover has completed
+                #   - RDS-EVENT-0003 # DB instance deleted.
+                #   - RDS-EVENT-0005 # DB instance created.
+                #   - RDS-EVENT-0026 # Applying off-line patches to DB instance.
+                #   - RDS-EVENT-0047 # Database instance patched.
+                #   - RDS-EVENT-0087 # DB instance stopped.
+                #   - RDS-EVENT-0069 # Cluster failover failed, check the health of your cluster instances and try again.
+                #   - RDS-EVENT-0153 # DB cluster is being started due to it exceeding the maximum allowed time being stopped.
+                #   - RDS-EVENT-0049 # Multi-AZ instance failover completed
+                #   - RDS-EVENT-0057 # Replication streaming has been terminated
+                #   - RDS-EVENT-0034 # Abandoning user requested failover since a failover recently occurred on the database instance.
+
+Outputs:
+  RdsFailoverNotifyTopicArn:
+    Description: "SNS Topic ARN"
+    Value: !Ref RdsFailoverNotifyTopic
+  LambdaFunctionArn:
+    Description: "Lambda Function ARN"
+    Value: !GetAtt RDSFailoverNotificationFunction.Arn
