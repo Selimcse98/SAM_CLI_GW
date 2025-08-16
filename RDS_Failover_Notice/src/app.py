@@ -20,6 +20,12 @@ def lambda_handler(event, context):
         failover_type = "READER"
     elif "writer" in event_message.lower():
         failover_type = "WRITER"
+    elif "failover" in event_message.lower():
+        failover_type = "failover"
+    elif "restarted" in event_message.lower():
+        failover_type = "restarted"
+    elif "shutdown" in event_message.lower():
+        failover_type = "shutdown"
     
     # Prepare the notification message
     subject = f"AWS RDS {failover_type} Failover Notification"
