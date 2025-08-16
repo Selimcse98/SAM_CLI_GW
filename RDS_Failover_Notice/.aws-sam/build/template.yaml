@@ -16,8 +16,14 @@ Resources:
       Subscription:
       - Protocol: email
         Endpoint: mmiah@guidewire.com
+      - Protocol: email
+        Endpoint: kroy@guidewire.com
+      - Protocol: email
+        Endpoint: aragunathan@guidewire.com
+      - Protocol: email
+        Endpoint: sdatta@guidewire.com
       - Protocol: sms
-        Endpoint: '0469214498'
+        Endpoint: '+61469214498'
   RDSFailoverNotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
