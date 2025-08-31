@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM application to scale an Auto Scaling Group up and down based on a schedule.
+
+Parameters:
+  ASGName:
+    Type: String
+    Description: The name of the Auto Scaling Group to manage.
+    Default: IsCloudopsdevDevPat1AbApplication-AutoScalingGroup-3OTVKZRC98L2
+  SNSTopicName:
+    Type: String
+    Description: The name of the SNS topic for notifications.
+    Default: ASGScalingNotifications
+  NotificationEmail:
+    Type: String
+    Description: The email address to receive notifications.
+    Default: mmiah@guidewire.com
+
+Resources:
+  ScaleDownFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ScaleDownASG
+      CodeUri: src/scale_down/
+      Handler: scale_down_function.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Timeout: 60
+      Environment:
+        Variables:
+          ASG_NAME: !Ref ASGName
+          SNS_TOPIC_ARN: !Ref SNSTopic
+      Policies:
+        - Statement:
+          - Effect: Allow
+            Action:
+              - autoscaling:DescribeAutoScalingGroups
+              - autoscaling:UpdateAutoScalingGroup
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - sns:Publish
+            Resource: !Ref SNSTopic
+
+  ScaleUpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ScaleUpASG
+      CodeUri: src/scale_up/
+      Handler: scale_up_function.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+      Timeout: 60
+      Environment:
+        Variables:
+          ASG_NAME: !Ref ASGName
+          SNS_TOPIC_ARN: !Ref SNSTopic
+      Policies:
+        - Statement:
+          - Effect: Allow
+            Action:
+              - autoscaling:DescribeAutoScalingGroups
+              - autoscaling:UpdateAutoScalingGroup
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - sns:Publish
+            Resource: !Ref SNSTopic
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref SNSTopicName
+      Subscription:
+        - Endpoint: !Ref NotificationEmail
+          Protocol: email
+
+  ScaleDownSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Trigger to scale down the ASG at 6 PM daily"
+      ScheduleExpression: "cron(0 18 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ScaleDownFunction.Arn
+          Id: "ScaleDownASGTarget"
+    DependsOn: ScaleDownFunction
+
+  ScaleUpSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Trigger to scale up the ASG at 7 AM daily"
+      ScheduleExpression: "cron(0 7 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ScaleUpFunction.Arn
+          Id: "ScaleUpASGTarget"
+    DependsOn: ScaleUpFunction
+
+  PermissionForEventsToInvokeScaleDownLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ScaleDownFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt ScaleDownSchedule.Arn
+
+  PermissionForEventsToInvokeScaleUpLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ScaleUpFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt ScaleUpSchedule.Arn
+
+Outputs:
+  ScaleDownFunctionName:
+    Description: "Scale Down Lambda Function Name"
+    Value: !Ref ScaleDownFunction
+  ScaleUpFunctionName:
+    Description: "Scale Up Lambda Function Name"
+    Value: !Ref ScaleUpFunction
+  SNSTopicName:
+    Description: "SNS Topic Name for notifications"
+    Value: !GetAtt SNSTopic.TopicName
