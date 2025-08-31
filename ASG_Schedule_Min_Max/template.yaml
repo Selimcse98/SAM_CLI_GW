@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Auto Scaling Group Scheduler with SNS Notifications
+
+Parameters:
+  ASGName:
+    Type: String
+    Default: IsCloudopsdevDevPat1AbApplication-AutoScalingGroup-3OTVKZRC98L2
+    Description: Name of the Auto Scaling Group to manage
+  SNSEmail:
+    Type: String
+    Default: mmiah@guidewire.com
+    Description: Email address for SNS notifications
+
+Resources:
+  # SNS Topic for notifications
+  ASGNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: ASG-Scheduler-Notifications
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref SNSEmail
+
+  # IAM Role for Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ASGAndSNSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:UpdateAutoScalingGroup
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref ASGNotificationTopic
+
+  # Lambda function to decrease ASG capacity
+  DecreaseASGCapacityFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: Decrease-ASG-Capacity
+      Runtime: python3.13
+      Handler: lambda_function.lambda_handler
+      CodeUri: decrease_asg_capacity/
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          ASG_NAME: !Ref ASGName
+          SNS_TOPIC_ARN: !Ref ASGNotificationTopic
+      Timeout: 30
+
+  # Lambda function to increase ASG capacity
+  IncreaseASGCapacityFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: Increase-ASG-Capacity
+      Runtime: python3.13
+      Handler: lambda_function.lambda_handler
+      CodeUri: increase_asg_capacity/
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          ASG_NAME: !Ref ASGName
+          SNS_TOPIC_ARN: !Ref ASGNotificationTopic
+      Timeout: 30
+
+  # EventBridge Rule for decreasing ASG capacity at 6 PM
+  DecreaseASGRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Trigger ASG capacity decrease at 6 PM daily
+      ScheduleExpression: cron(0 9 ? * * *) # ScheduleExpression: "cron(0 18 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt DecreaseASGCapacityFunction.Arn
+          Id: DecreaseASGTarget
+
+  # EventBridge Rule for increasing ASG capacity at 7 AM
+  IncreaseASGRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Trigger ASG capacity increase at 7 AM daily
+      ScheduleExpression: cron(0 21 ? * * *) # ScheduleExpression: "cron(0 7 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt IncreaseASGCapacityFunction.Arn
+          Id: IncreaseASGTarget
+
+  # Permission for EventBridge to invoke Lambda functions
+  DecreaseASGPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DecreaseASGCapacityFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DecreaseASGRule.Arn
+
+  IncreaseASGPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref IncreaseASGCapacityFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt IncreaseASGRule.Arn
+
+Outputs:
+  DecreaseASGFunction:
+    Description: Decrease ASG Capacity Lambda Function
+    Value: !Ref DecreaseASGCapacityFunction
+  IncreaseASGFunction:
+    Description: Increase ASG Capacity Lambda Function
+    Value: !Ref IncreaseASGCapacityFunction
+  NotificationTopic:
+    Description: SNS Topic for ASG notifications
+    Value: !Ref ASGNotificationTopic

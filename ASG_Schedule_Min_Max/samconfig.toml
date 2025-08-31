@@ -1,0 +1,11 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "ASG-Scale-up-and-down"
+resolve_s3 = true
+s3_prefix = "ASG-Scale-up-and-down"
+region = "us-east-2"
+profile = "gwre-is-cloudops-dev"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "ASGName=\"IsCloudopsdevDevPat1AbApplication-AutoScalingGroup-3OTVKZRC98L2\" SNSEmail=\"mmiah@guidewire.com\""
+image_repositories = []

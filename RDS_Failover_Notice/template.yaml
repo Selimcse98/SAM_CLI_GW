@@ -23,7 +23,11 @@ Resources:
         - Protocol: email
           Endpoint: aragunathan@guidewire.com
         - Protocol: email
-          Endpoint: sdatta@guidewire.com  
+          Endpoint: sdatta@guidewire.com
+        - Protocol: email
+          Endpoint: gpadmavathi@guidewire.com
+        - Protocol: email
+          Endpoint: kpham@guidewire.com
         - Protocol: "sms"
           Endpoint: "+61469214498"
 
